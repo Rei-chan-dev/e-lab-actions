@@ -4,13 +4,12 @@ from datetime import datetime
 import json
 from typing import List, Dict
 import feedparser
-import json
 from dotenv import load_dotenv
 import os
 from youtube_transcript_api import YouTubeTranscriptApi
 
-load_dotenv()
-admin_sdk_json = os.getenv("ADMINSDK_JSON")
+#load_dotenv()
+admin_sdk_json = "serviceAccount.json"
 bucket_name = os.getenv("BUCKET_NAME")
 
 # Firebase初期化
@@ -144,16 +143,17 @@ def save_videos_batch_to_channel(channel_id: str, channel_name: str, channel_ico
 
         for video in videos:
             doc_ref = channel_doc_ref.collection('videos').document(video['videoId'])
-            batch.set(doc_ref, {
-                'title': video['title'],
-                'link': video['link'],
-                'thumbnailUrl': video['thumbnailUrl'],
-                'subtitleUrl': video['subtitleUrl'],
-                'publishedAt': video['publishedAt'].isoformat(),
-                'videoId': video['videoId'],
-                'createdAt': firestore.SERVER_TIMESTAMP,
-                'channelId': channel_id,
-            })
+            if not doc_ref.get().exists:
+                batch.set(doc_ref, {
+                    'title': video['title'],
+                    'link': video['link'],
+                    'thumbnailUrl': video['thumbnailUrl'],
+                    'subtitleUrl': video['subtitleUrl'],
+                    'publishedAt': video['publishedAt'].isoformat(),
+                    'videoId': video['videoId'],
+                    'createdAt': firestore.SERVER_TIMESTAMP,
+                    'channelId': channel_id,
+                })
 
         batch.commit()
         print(f"{len(videos)} 件の動画をチャンネル「{channel_name}」に保存しました。")
@@ -165,7 +165,6 @@ def load_channels_from_json(file_path='channels.json') -> List[Dict]:
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
     
-
 def get_transcript_as_json(video_id: str) -> str | None:
     """
     指定されたYouTube動画IDの英語字幕を取得し、start, end, text を含むJSON形式の文字列に変換する。
@@ -178,7 +177,10 @@ def get_transcript_as_json(video_id: str) -> str | None:
         transcript = None
         for lang_code in ['en', 'en-US', 'en-GB']:
             try:
-                transcript = transcript_list.find_transcript([lang_code])
+                candidate = transcript_list.find_transcript([lang_code])
+                if candidate.is_generated:
+                    continue  # 自動字幕ならスキップ
+                transcript = candidate
                 break
             except:
                 continue
@@ -243,6 +245,18 @@ if __name__ == "__main__":
             )
         except Exception as e:
             print(f"❌ チャンネル「{ch['name']}」の処理中にエラー: {e}")
+    
+    # rss_feeds = [
+    #     "https://feeds.bbci.co.uk/news/world/rss.xml",
+    #     "https://www.japantimes.co.jp/feed/news",
+    #     "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    #     # 他のフィードもここに追加可能
+    # ]
+    
+    # for rss_url in rss_feeds:
+    #     print(f"\n🌐 RSSフィードから記事取得中: {rss_url}")
+    #     articles = fetch_articles_from_rss(rss_url)
+    #     save_articles_batch(articles)
     # 使用例
     #channels = load_channels_from_json()
     #for ch in channels:
