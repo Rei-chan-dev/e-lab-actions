@@ -205,6 +205,7 @@ def get_transcript_as_json(video_id: str) -> str | None:
     except Exception as e:
         #print(f"⚠️ 字幕取得エラー: {e}")
         return None
+        
 
 def upload_transcript_to_firebase_storage(json_content: str, video_id: str) -> str:
     """
